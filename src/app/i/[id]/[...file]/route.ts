@@ -1,4 +1,3 @@
-// src/app/i/[id]/[...file]/route.ts
 import type { NextRequest } from 'next/server';
 import { list } from '@vercel/blob';
 
@@ -22,12 +21,14 @@ export async function GET(
   const rel = file.join('/');
   const pathname = `i/${id}/${rel}`;
 
-  const { blobs } = await list({ prefix: pathname, limit: 1 });
-  const blob = blobs.find((b) => b.pathname === pathname);
+  const { blobs } = await list({ prefix: pathname, limit: 10 });
+  const blob = blobs.find(b => b.pathname === pathname) ?? blobs[0]; // 접미사 폴백
   if (!blob) return new Response('Not found', { status: 404 });
 
-  // downloadUrl 우선 → 없으면 url
-  const upstream = await fetch((blob as any).downloadUrl ?? blob.url);
+  const urlToFetch =
+    (blob as unknown as { downloadUrl?: string; url: string }).downloadUrl ?? blob.url;
+
+  const upstream = await fetch(urlToFetch);
   if (!upstream.ok) return new Response('Upstream error', { status: 502 });
 
   return new Response(upstream.body, {

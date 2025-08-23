@@ -9,13 +9,13 @@ export async function POST(request: Request) {
       body,
       request,
       onBeforeGenerateToken: async (pathname) => {
-        // 허용: i/1234567/(index.html|merged.png|thumb_1200x630.jpg)
+        // 허용 경로만
         if (!/^i\/[0-9]{6,10}\/(index\.html|merged\.png|thumb_1200x630\.jpg)$/i.test(pathname)) {
           throw new Error('허용되지 않은 경로 또는 파일명');
         }
         return {
           allowedContentTypes: ['text/html', 'image/png', 'image/jpeg'],
-          addRandomSuffix: false,
+          addRandomSuffix: false,                // ← 이게 핵심!
         };
       },
       onUploadCompleted: async ({ blob }) => {
