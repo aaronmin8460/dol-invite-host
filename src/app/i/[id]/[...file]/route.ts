@@ -39,3 +39,12 @@ export async function GET(
     },
   });
 }
+// 맨 아래에 추가
+export async function HEAD(
+  req: NextRequest,
+  ctx: { params: Promise<{ id: string; file: string[] }> }
+): Promise<Response> {
+  const getRes = await GET(req, ctx);
+  // 헤더/상태만 그대로, 본문은 제거
+  return new Response(null, { status: getRes.status, headers: getRes.headers });
+}
