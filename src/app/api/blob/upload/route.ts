@@ -6,7 +6,8 @@ export async function POST(request: Request) {
 
   try {
     const json = await handleUpload({
-      body, request,
+      body,
+      request,
       onBeforeGenerateToken: async (pathname) => {
         // 허용: i/1234567/(index.html|merged.png|thumb_1200x630.jpg)
         if (!/^i\/[0-9]{6,10}\/(index\.html|merged\.png|thumb_1200x630\.jpg)$/i.test(pathname)) {
@@ -23,7 +24,8 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(json);
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }

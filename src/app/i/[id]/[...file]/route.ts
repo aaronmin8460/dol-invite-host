@@ -20,10 +20,10 @@ export async function GET(
 
   const pathname = `i/${id}/${rel}`;
   const { blobs } = await list({ prefix: pathname, limit: 1 });
-  const blob = blobs.find(b => b.pathname === pathname);
+  const blob = blobs.find((b) => b.pathname === pathname);
   if (!blob) return new Response('Not found', { status: 404 });
 
-  const upstream = await fetch((blob as any).downloadUrl ?? blob.url);
+  const upstream = await fetch(blob.url);
   if (!upstream.ok) return new Response('Upstream error', { status: 502 });
 
   return new Response(upstream.body, {
