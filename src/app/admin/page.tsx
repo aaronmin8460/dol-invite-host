@@ -9,14 +9,29 @@ export default function AdminPage() {
   const [id, setId] = useState<string>('');
   const [status, setStatus] = useState<string>('');
 
-  async function genId() {
+// src/app/admin/page.tsx 내
+async function genId() {
+  try {
     setStatus('ID 생성 중...');
-    const res = await fetch('/api/invites/new-id');
+    const res = await fetch('/api/invites/new-id', { cache: 'no-store' });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      setStatus(`ID 생성 실패: ${res.status} ${text}`);
+      return; // ← 실패면 여기서 끝
+    }
     const data = await res.json();
-    if (!res.ok) return alert(data.error || 'ID 생성 실패');
+    if (!data?.id) {
+      setStatus('ID 생성 실패: 응답 형식 오류');
+      return;
+    }
     setId(String(data.id));
     setStatus(`ID 생성 완료: ${data.id}`);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    setStatus(`ID 생성 에러: ${msg}`);
   }
+}
+
 
   async function handleUpload(e: React.FormEvent) {
     e.preventDefault();

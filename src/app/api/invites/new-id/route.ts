@@ -1,33 +1,46 @@
-// src/app/api/invites/new-id/route.ts
+import type { NextRequest } from 'next/server';
 import { list } from '@vercel/blob';
 
-// (선택) 라우트를 항상 서버에서 동적으로 처리
 export const dynamic = 'force-dynamic';
 
-// 7자리 숫자 ID 생성
 function genNumericId(len = 7): string {
   const min = 10 ** (len - 1);
   const max = (10 ** len) - 1;
   return String(Math.floor(Math.random() * (max - min + 1)) + min);
 }
 
-// 반드시 "export async function GET()" 를 내보내야 Next가 라우트로 인식합니다.
-export async function GET(): Promise<Response> {
-  // 충돌 방지: i/<id>/index.html 존재 여부 확인 후, 없는 ID만 반환
+export async function GET(_req: NextRequest): Promise<Response> {
+  // ▶ Blob 토큰 필수 확인 (환경변수 이름 두 가지 모두 시도)
+  const token =
+    process.env.BLOB_READ_WRITE_TOKEN ?? process.env.VERCEL_BLOB_READ_WRITE_TOKEN;
+
+  if (!token) {
+    return new Response(
+      JSON.stringify({ error: 'Blob token missing (환경변수 설정/재배포 필요)' }),
+      { status: 500, headers: { 'content-type': 'application/json; charset=utf-8' } }
+    );
+  }
+
+  // 최대 8회만 시도 (무한 루프 방지)
   for (let tries = 0; tries < 8; tries++) {
     const id = genNumericId(7);
     const pathname = `i/${id}/index.html`;
-    const { blobs } = await list({ prefix: pathname, limit: 1 });
-    const exists = blobs.some(b => b.pathname === pathname);
+
+    // ▶ 접미사 붙어 업로드된 과거 파일도 존재로 간주(폴백)
+    const { blobs } = await list({ prefix: pathname, limit: 5, token });
+    const exists = blobs.some(
+      (b) => b.pathname === pathname || b.pathname.startsWith(pathname + '-')
+    );
+
     if (!exists) {
       return new Response(JSON.stringify({ id }), {
-        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        headers: { 'content-type': 'application/json; charset=utf-8' },
       });
     }
   }
 
-  return new Response(JSON.stringify({ error: '고유 ID 생성 실패(잠시 후 다시 시도)' }), {
-    status: 503,
-    headers: { 'Content-Type': 'application/json; charset=utf-8' },
-  });
+  return new Response(
+    JSON.stringify({ error: '고유 ID 생성 실패(잠시 후 다시 시도)' }),
+    { status: 503, headers: { 'content-type': 'application/json; charset=utf-8' } }
+  );
 }
