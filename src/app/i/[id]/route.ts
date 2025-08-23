@@ -1,13 +1,18 @@
-// src/app/i/[id]/route.ts
+import type { NextRequest } from 'next/server';
 import { list } from '@vercel/blob';
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
-  const id = params.id;
+export const dynamic = 'force-dynamic';
+
+export async function GET(
+  _req: NextRequest,
+  ctx: { params: Promise<{ id: string }> }
+): Promise<Response> {
+  const { id } = await ctx.params;
   if (!/^[0-9]{6,10}$/.test(id)) return new Response('Invalid id', { status: 400 });
 
   const pathname = `i/${id}/index.html`;
   const { blobs } = await list({ prefix: pathname, limit: 1 });
-  const blob = blobs.find(b => b.pathname === pathname);
+  const blob = blobs.find((b) => b.pathname === pathname);
   if (!blob) return new Response('Not found', { status: 404 });
 
   const upstream = await fetch(blob.url);

@@ -1,5 +1,7 @@
-// src/app/i/[id]/[...file]/route.ts
+import type { NextRequest } from 'next/server';
 import { list } from '@vercel/blob';
+
+export const dynamic = 'force-dynamic';
 
 const mime = (name: string) => {
   if (name.endsWith('.png')) return 'image/png';
@@ -10,18 +12,17 @@ const mime = (name: string) => {
 };
 
 export async function GET(
-  _req: Request,
-  { params }: { params: { id: string; file?: string[] } }
-) {
-  const id = params.id;
+  _req: NextRequest,
+  ctx: { params: Promise<{ id: string; file: string[] }> }
+): Promise<Response> {
+  const { id, file } = await ctx.params; // Next 15: params는 Promise
   if (!/^[0-9]{6,10}$/.test(id)) return new Response('Invalid id', { status: 400 });
 
-  const rel = (params.file ?? []).join('/');
-  if (!rel) return new Response('Not found', { status: 404 });
-
+  const rel = file.join('/');            // [...file]은 필수 → 빈 배열일 일은 없음
   const pathname = `i/${id}/${rel}`;
+
   const { blobs } = await list({ prefix: pathname, limit: 1 });
-  const blob = blobs.find(b => b.pathname === pathname);
+  const blob = blobs.find((b) => b.pathname === pathname);
   if (!blob) return new Response('Not found', { status: 404 });
 
   const upstream = await fetch(blob.url);
