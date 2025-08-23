@@ -1,3 +1,4 @@
+// src/app/i/[id]/[...file]/route.ts
 import type { NextRequest } from 'next/server';
 import { list } from '@vercel/blob';
 
@@ -15,17 +16,18 @@ export async function GET(
   _req: NextRequest,
   ctx: { params: Promise<{ id: string; file: string[] }> }
 ): Promise<Response> {
-  const { id, file } = await ctx.params; // Next 15: params는 Promise
+  const { id, file } = await ctx.params;
   if (!/^[0-9]{6,10}$/.test(id)) return new Response('Invalid id', { status: 400 });
 
-  const rel = file.join('/');            // [...file]은 필수 → 빈 배열일 일은 없음
+  const rel = file.join('/');
   const pathname = `i/${id}/${rel}`;
 
   const { blobs } = await list({ prefix: pathname, limit: 1 });
   const blob = blobs.find((b) => b.pathname === pathname);
   if (!blob) return new Response('Not found', { status: 404 });
 
-  const upstream = await fetch(blob.url);
+  // downloadUrl 우선 → 없으면 url
+  const upstream = await fetch((blob as any).downloadUrl ?? blob.url);
   if (!upstream.ok) return new Response('Upstream error', { status: 502 });
 
   return new Response(upstream.body, {

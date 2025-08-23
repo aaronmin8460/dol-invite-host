@@ -36,6 +36,7 @@ export default function AdminPage() {
       const content = await file.async('blob');
       await upload(`i/${id}/${name}`, content, {
        access: 'public',
+       addRandomSuffix: false,
   handleUploadUrl: '/api/blob/upload',
   contentType:
     name.endsWith('.html') ? 'text/html' :
