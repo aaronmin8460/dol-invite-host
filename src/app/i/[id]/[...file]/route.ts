@@ -3,6 +3,8 @@ import { list } from '@vercel/blob';
 
 export const dynamic = 'force-dynamic';
 
+type BlobRef = { url: string; pathname: string; downloadUrl?: string };
+
 const mime = (name: string) => {
   if (name.endsWith('.png')) return 'image/png';
   if (name.endsWith('.jpg') || name.endsWith('.jpeg')) return 'image/jpeg';
@@ -18,17 +20,16 @@ export async function GET(
   const { id, file } = await ctx.params;
   if (!/^[0-9]{6,10}$/.test(id)) return new Response('Invalid id', { status: 400 });
 
+  const token = process.env.BLOB_READ_WRITE_TOKEN ?? process.env.VERCEL_BLOB_READ_WRITE_TOKEN;
   const rel = file.join('/');
   const pathname = `i/${id}/${rel}`;
 
-  const { blobs } = await list({ prefix: pathname, limit: 10 });
-  const blob = blobs.find(b => b.pathname === pathname) ?? blobs[0]; // 접미사 폴백
-  if (!blob) return new Response('Not found', { status: 404 });
+  const { blobs } = await list({ prefix: pathname, limit: 10, token });
+  const found = blobs.find(b => b.pathname === pathname) ?? blobs[0];
+  if (!found) return new Response('Not found', { status: 404 });
 
-  const urlToFetch =
-    (blob as unknown as { downloadUrl?: string; url: string }).downloadUrl ?? blob.url;
-
-  const upstream = await fetch(urlToFetch);
+  const ref = found as unknown as BlobRef;
+  const upstream = await fetch(ref.downloadUrl ?? ref.url);
   if (!upstream.ok) return new Response('Upstream error', { status: 502 });
 
   return new Response(upstream.body, {
