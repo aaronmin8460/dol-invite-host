@@ -1,3 +1,4 @@
+// src/app/i/[id]/[...file]/route.ts
 import { list } from '@vercel/blob';
 
 const mime = (name: string) => {
@@ -20,7 +21,7 @@ export async function GET(
 
   const pathname = `i/${id}/${rel}`;
   const { blobs } = await list({ prefix: pathname, limit: 1 });
-  const blob = blobs.find((b) => b.pathname === pathname);
+  const blob = blobs.find(b => b.pathname === pathname);
   if (!blob) return new Response('Not found', { status: 404 });
 
   const upstream = await fetch(blob.url);
