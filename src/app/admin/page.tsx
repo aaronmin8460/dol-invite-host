@@ -13,6 +13,8 @@ export default function AdminPage() {
   const [useServer, setUseServer] = useState<boolean>(true); // 느린망/보안망 권장 (기본 ON)
   const lastProgressAtRef = useRef<number>(0);
 
+  const SERVER_LIMIT = 4_500_000; // ≈4.5MB: 이보다 크면 ZIP 통째 업로드 대신 파일별 업로드
+
   // ───────────────── ID 생성
   async function genId() {
     try {
@@ -52,7 +54,7 @@ export default function AdminPage() {
       setStatus('연결 테스트: 직접 업로드 중…');
       const blob = new Blob(['hello'], { type: 'text/plain' });
       const ac = new AbortController();
-      const timer = setTimeout(() => ac.abort(), 15000); // 15초 타임아웃
+      const timer = setTimeout(() => ac.abort(), 15000);
       lastProgressAtRef.current = Date.now();
 
       await upload(`i/probe-${Date.now()}/probe.txt`, blob, {
@@ -71,14 +73,7 @@ export default function AdminPage() {
     } catch (e) {
       const msg = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
       setStatus('직접 업로드 실패');
-      alert(
-        [
-          '직접 업로드 실패 (차단/지연 가능성).',
-          `원인: ${msg}`,
-          '',
-          '※ "서버로 업로드(느린망/보안망 권장)" 옵션을 사용하세요.',
-        ].join('\n'),
-      );
+      alert(['직접 업로드 실패 (차단/지연 가능).', `원인: ${msg}`, '', '※ "서버로 업로드(권장)" 옵션을 사용하세요.'].join('\n'));
     }
   }
 
@@ -110,36 +105,59 @@ export default function AdminPage() {
       chosen.push(name);
     }
 
-    // 1) 서버로 업로드(권장) — 느린망/보안망에서도 안정적
+    // 1) 서버 업로드(권장)
     if (useServer) {
       try {
-        setStatus('서버로 업로드 중…');
-        const fd = new FormData();
-        fd.append('id', id);
-        fd.append('zip', zipFile);
-        const r = await fetch('/api/upload-zip', { method: 'POST', body: fd, cache: 'no-store' });
-        const text = await r.text();
-        let j: { ok?: boolean; error?: string } = {};
-        try { j = JSON.parse(text); } catch {}
-        if (!r.ok || !j?.ok) throw new Error(j?.error ?? `HTTP ${r.status} ${text}`);
+        // ZIP이 작으면 통째 업로드
+        if (zipFile.size <= SERVER_LIMIT) {
+          setStatus('서버로 업로드 중…');
+          const fd = new FormData();
+          fd.append('id', id);
+          fd.append('zip', zipFile);
+          const r = await fetch('/api/upload-zip', { method: 'POST', body: fd, cache: 'no-store' });
+          const text = await r.text();
+          let j: { ok?: boolean; error?: string } = {};
+          try { j = JSON.parse(text); } catch {}
+          if (!r.ok || !j?.ok) throw new Error(j?.error ?? `HTTP ${r.status} ${text}`);
+        } else {
+          // ZIP이 크면 파일별 업로드로 자동 전환
+          setStatus('서버로 업로드 중… (대용량: 파일별 업로드)');
+          for (const name of chosen) {
+            const file = pick(zip, name)!;
+            const blob = await file.async('blob');
+            if (blob.size > SERVER_LIMIT) {
+              throw new Error(`${name} 파일이 너무 큽니다 (${(blob.size/1_000_000).toFixed(1)}MB). 
+빌더에서 merged를 JPG(품질 0.85~0.9), 폭 ≤2000px로 저장하거나, 체크 해제하여 "직접 업로드"를 사용하세요.`);
+            }
+            const fd = new FormData();
+            fd.append('id', id);
+            fd.append('name', name);
+            fd.append('file', new File([blob], name, { type: blob.type || 'application/octet-stream' }));
+            const r = await fetch('/api/upload-one', { method: 'POST', body: fd, cache: 'no-store' });
+            const txt = await r.text();
+            let j: { ok?: boolean; error?: string } = {};
+            try { j = JSON.parse(txt); } catch {}
+            if (!r.ok || !j?.ok) throw new Error(j?.error ?? `HTTP ${r.status} ${txt}`);
+          }
+        }
+
         setStatus('완료! 새 창을 여는 중…');
         window.open(`/i/${id}/`, '_blank');
         return;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         setStatus('서버 업로드 실패: ' + msg);
-        alert('서버 업로드 실패. 잠시 후 다시 시도하거나 다른 네트워크/브라우저를 사용해 주세요.');
+        alert('서버 업로드 실패. 잠시 후 다시 시도하거나, "직접 업로드"로 전환해 보세요.');
         return;
       }
     }
 
-    // 2) 클라이언트 → Blob 직접 업로드 (빠름, 단 일부 환경에서 차단됨)
+    // 2) 직접 업로드 (빠름, 단 일부 환경에서 차단 가능)
     try {
       setStatus('업로드 중(직접)…');
       const ac = new AbortController();
       lastProgressAtRef.current = Date.now();
       const watchdog = setInterval(() => {
-        // 20초 동안 onUploadProgress가 없으면 중단
         if (Date.now() - lastProgressAtRef.current > 20000) {
           ac.abort();
           clearInterval(watchdog);
@@ -187,15 +205,9 @@ export default function AdminPage() {
       </div>
 
       <form onSubmit={handleUpload} style={{ display: 'grid', gap: 12 }}>
-        <label>
-          Invite ZIP <input ref={zipRef} type="file" accept=".zip" required />
-        </label>
+        <label>Invite ZIP <input ref={zipRef} type="file" accept=".zip" required /></label>
         <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <input
-            type="checkbox"
-            checked={useServer}
-            onChange={(e) => setUseServer(e.target.checked)}
-          />
+          <input type="checkbox" checked={useServer} onChange={(e) => setUseServer(e.target.checked)} />
           서버로 업로드(느린망/보안망 권장)
         </label>
         <button type="submit">업로드 & 배포</button>
