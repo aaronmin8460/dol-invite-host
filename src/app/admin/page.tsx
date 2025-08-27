@@ -10,7 +10,7 @@ export default function AdminPage() {
   const [id, setId] = useState<string>('');
   const [status, setStatus] = useState<string>('');
   const [progress, setProgress] = useState<number>(0);
-  const [useServer, setUseServer] = useState<boolean>(true); // 느린망/보안망 권장 (기본 ON)
+  const [useServer, setUseServer] = useState<boolean>(false); // 느린망/보안망 권장 (기본 ON)
   const lastProgressAtRef = useRef<number>(0);
 
   const SERVER_LIMIT = 4_500_000; // ≈4.5MB: 이보다 크면 ZIP 통째 업로드 대신 파일별 업로드
