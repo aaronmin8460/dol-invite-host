@@ -10,7 +10,7 @@ export default function AdminPage() {
   const [id, setId] = useState<string>('');
   const [status, setStatus] = useState<string>('');
   const [progress, setProgress] = useState<number>(0);
-  const [useServer, setUseServer] = useState<boolean>(true); // 느린망/보안망 권장 기본 ON
+  const [useServer, setUseServer] = useState<boolean>(true); // 느린망/보안망 권장 (기본 ON)
   const lastProgressAtRef = useRef<number>(0);
 
   // ───────────────── ID 생성
@@ -23,14 +23,13 @@ export default function AdminPage() {
         setStatus(`ID 생성 실패: ${res.status} ${text}`);
         return;
       }
-      const data: unknown = await res.json();
-      const newId = (data as { id?: string | number }).id;
-      if (!newId) {
+      const data = (await res.json()) as { id?: string | number };
+      if (!data?.id) {
         setStatus('ID 생성 실패: 응답 형식 오류');
         return;
       }
-      setId(String(newId));
-      setStatus(`ID 생성 완료: ${newId}`);
+      setId(String(data.id));
+      setStatus(`ID 생성 완료: ${data.id}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setStatus(`ID 생성 에러: ${msg}`);
@@ -73,9 +72,12 @@ export default function AdminPage() {
       const msg = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
       setStatus('직접 업로드 실패');
       alert(
-        ['직접 업로드 실패 (차단/지연 가능).', `원인: ${msg}`, '', '※ "서버로 업로드(권장)" 옵션을 사용하세요.'].join(
-          '\n',
-        ),
+        [
+          '직접 업로드 실패 (차단/지연 가능성).',
+          `원인: ${msg}`,
+          '',
+          '※ "서버로 업로드(느린망/보안망 권장)" 옵션을 사용하세요.',
+        ].join('\n'),
       );
     }
   }
@@ -115,9 +117,11 @@ export default function AdminPage() {
         const fd = new FormData();
         fd.append('id', id);
         fd.append('zip', zipFile);
-        const r = await fetch('/api/upload-zip', { method: 'POST', body: fd });
-        const j = (await r.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-        if (!r.ok || !j?.ok) throw new Error(j?.error ?? `HTTP ${r.status}`);
+        const r = await fetch('/api/upload-zip', { method: 'POST', body: fd, cache: 'no-store' });
+        const text = await r.text();
+        let j: { ok?: boolean; error?: string } = {};
+        try { j = JSON.parse(text); } catch {}
+        if (!r.ok || !j?.ok) throw new Error(j?.error ?? `HTTP ${r.status} ${text}`);
         setStatus('완료! 새 창을 여는 중…');
         window.open(`/i/${id}/`, '_blank');
         return;
@@ -129,7 +133,7 @@ export default function AdminPage() {
       }
     }
 
-    // 2) 클라이언트 → Blob 직접 업로드
+    // 2) 클라이언트 → Blob 직접 업로드 (빠름, 단 일부 환경에서 차단됨)
     try {
       setStatus('업로드 중(직접)…');
       const ac = new AbortController();
@@ -177,13 +181,9 @@ export default function AdminPage() {
       </p>
 
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '12px 0' }}>
-        <button type="button" onClick={genId}>
-          ID 생성
-        </button>
+        <button type="button" onClick={genId}>ID 생성</button>
         <input value={id} readOnly style={{ width: 160 }} placeholder="ID 미생성" />
-        <button type="button" onClick={probeClientUpload}>
-          연결 테스트(직접 업로드)
-        </button>
+        <button type="button" onClick={probeClientUpload}>연결 테스트(직접 업로드)</button>
       </div>
 
       <form onSubmit={handleUpload} style={{ display: 'grid', gap: 12 }}>
