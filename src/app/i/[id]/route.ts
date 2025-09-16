@@ -71,28 +71,36 @@ async function buildHtml(
     thumbRef?.url ??
     `${canonicalOrigin}/i/${id}/thumb_1200x630.jpg`;
 
-  // <title>에서 제목 추출(없으면 기본값)
-  const titleMatch = html.match(/<title>(.*?)<\/title>/i);
-  const title = (titleMatch?.[1] ?? '초대장').trim();
+// <title>에서 제목 추출
+const titleMatch = html.match(/<title>(.*?)<\/title>/i);
+const title = (titleMatch?.[1] ?? '초대장').trim();
+
+// <meta property="og:description"> 또는 <meta name="description"> 추출
+const descMatch =
+  html.match(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i) ||
+  html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i);
+const desc = (descMatch?.[1] ?? '우리 아이 첫 돌잔치에 초대합니다').trim();
+
 
   // base 태그가 없으면 추가
   const hasBase = /<base\s/i.test(html);
   const baseTag = hasBase ? '' : `<base href="/i/${id}/">`;
 
   // 절대 OG/Twitter 메타를 <head> 맨 앞에 주입
-  const ogMeta =
-    `<meta property="og:url" content="${pageUrl}">` +
-    `<meta property="og:type" content="website">` +
-    `<meta property="og:title" content="${title}">` +
-    `<meta property="og:description" content="돌잔치 초대장">` +
-    `<meta property="og:image" content="${ogImageAbs}">` +
-    `<meta property="og:image:secure_url" content="${ogImageAbs}">` +
-    `<meta property="og:image:width" content="1200">` +
-    `<meta property="og:image:height" content="630">` +
-    `<meta name="twitter:card" content="summary_large_image">` +
-    `<meta name="twitter:title" content="${title}">` +
-    `<meta name="twitter:description" content="돌잔치 초대장">` +
-    `<meta name="twitter:image" content="${ogImageAbs}">`;
+const ogMeta =
+  `<meta property="og:url" content="${pageUrl}">` +
+  `<meta property="og:type" content="website">` +
+  `<meta property="og:title" content="${title}">` +
+  `<meta property="og:description" content="${desc}">` +   // ✅ 추출된 desc 반영
+  `<meta property="og:image" content="${ogImageAbs}">` +
+  `<meta property="og:image:secure_url" content="${ogImageAbs}">` +
+  `<meta property="og:image:width" content="1200">` +
+  `<meta property="og:image:height" content="630">` +
+  `<meta name="twitter:card" content="summary_large_image">` +
+  `<meta name="twitter:title" content="${title}">` +
+  `<meta name="twitter:description" content="${desc}">` +   // ✅ 동일하게 반영
+  `<meta name="twitter:image" content="${ogImageAbs}">`;
+
 
   html = html.replace(/<head>/i, `<head>${baseTag}${ogMeta}`);
 
