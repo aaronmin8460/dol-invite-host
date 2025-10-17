@@ -79,7 +79,7 @@ const title = (titleMatch?.[1] ?? '초대장').trim();
 const descMatch =
   html.match(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i) ||
   html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i);
-const desc = (descMatch?.[1] ?? '우리 아이 첫 돌잔치에 초대합니다').trim();
+const desc = (descMatch?.[1] ?? '초대합니다').trim();
 
 
   // base 태그가 없으면 추가
